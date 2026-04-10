@@ -313,6 +313,8 @@ public class Adjuster extends ProcessEquipmentBaseClass {
       targetValueCurrent = targetStream.getThermoSystem().getFlowRate(targetUnit);
     } else if (targetVariable.equals("pressure")) {
       targetValueCurrent = targetStream.getThermoSystem().getPressure(targetUnit);
+    } else if (targetVariable.equals("temperature")) {
+      targetValueCurrent = targetStream.getTemperature(targetUnit);
     } else {
       targetValueCurrent = targetStream.getThermoSystem().getVolume(targetUnit);
     }
