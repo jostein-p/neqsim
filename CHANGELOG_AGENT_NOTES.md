@@ -9,6 +9,177 @@
 
 ---
 
+## 2026-07-13 — MCP Server: 42 Tools, 9 Prompts, 11 Resources
+
+### MCP Server Expansion Summary
+
+The NeqSim MCP Server has expanded from 8 basic tools to a comprehensive
+engineering simulation platform:
+
+**42 @Tool methods** in `NeqSimTools.java`:
+- 9 core thermodynamic tools (flash, batch, property table, phase envelope, validation, search, capabilities, example, schema)
+- 8 automation tools (list units, list variables, get/set variable, save/compare state, diagnose, learning report)
+- 3 analysis tools (cross-validation, parametric study, property table)
+- 8 domain-specific tools (PVT, flow assurance, standards, pipeline, reservoir, field economics, dynamic, bioprocess)
+- 7 session/workflow tools (session, task solver, workflow, validation, report, plugin, progress)
+- 7 platform tools (streaming, visualization, multi-server composition, security, state persistence, validation profiles, data catalog)
+
+**9 @Prompt guided workflows** in `NeqSimPrompts.java`:
+- gas processing, PVT study, flow assurance, field development, CCS, TEG dehydration, biorefinery, dynamic simulation, pipeline sizing
+
+**11 resource endpoints** in `NeqSimResources.java` (4 static + 7 templates):
+- example-catalog, schema-catalog, components, components/{name}, standards, standards/{code}, models, materials/{type}, data-tables, examples/{category}/{name}, schemas/{tool}/{type}
+
+### New Runner Classes (in `src/main/java/neqsim/mcp/runners/`)
+
+| Runner | Purpose |
+|--------|---------|
+| `PVTRunner` | PVT lab experiments (CME, CVD, DL, separator, swelling, GOR, viscosity) |
+| `FlowAssuranceRunner` | Hydrate, wax, asphaltene, corrosion, erosion, cooldown |
+| `StandardsRunner` | Gas/oil quality per 22 industry standards |
+| `PipelineRunner` | Multiphase pipeline flow (Beggs & Brill) |
+| `ReservoirRunner` | Material balance reservoir simulation |
+| `FieldDevelopmentRunner` | NPV, IRR, cash flow, fiscal regimes, decline curves |
+| `DynamicRunner` | Transient simulation with auto-instrumented PID controllers |
+| `BioprocessRunner` | Anaerobic digestion, fermentation, gasification, pyrolysis |
+| `CrossValidationRunner` | Multi-EOS cross-validation |
+| `ParametricStudyRunner` | Multi-variable parametric sweeps |
+| `SessionRunner` | Persistent simulation sessions (create/modify/run/snapshot/restore) |
+| `TaskSolverRunner` | Engineering task solving from high-level descriptions |
+| `EngineeringValidator` | Design rule validation against standards |
+| `ReportRunner` | Structured engineering report generation |
+| `McpRunnerPlugin` | Plugin interface for custom runners |
+| `PluginRegistry` | Plugin lifecycle management |
+| `ProgressTracker` | Long-running simulation progress tracking |
+| `StreamingRunner` | Async simulation with incremental polling |
+| `VisualizationRunner` | SVG/Mermaid/HTML visualization generation |
+| `CompositionRunner` | Multi-server MCP orchestration |
+| `SecurityRunner` | API key management, rate limiting, audit logging |
+| `StatePersistenceRunner` | Simulation state save/load/compare across restarts |
+| `ValidationProfileRunner` | Jurisdiction-specific validation (NCS, UKCS, GoM, Brazil, generic) |
+| `DataCatalogRunner` | Database browsing (components, standards, materials, EOS models) |
+
+### Key Architecture Points
+
+- All runners follow the stateless `Runner.run(String json) → String json` pattern
+- Runners live in neqsim core (`src/main/java/neqsim/mcp/runners/`)
+- MCP server is a thin Quarkus wrapper (`neqsim-mcp-server/`)
+- Each runner can be used independently from REST, CLI, or other MCP frameworks
+- New runners are added by implementing the runner + adding a @Tool method to NeqSimTools.java
+
+### Documentation Updated
+
+- `neqsim-mcp-server/README.md` — Full rewrite with all 42 tools, 11 resources, 9 prompts
+- `neqsim-mcp-server/MCP_CONTRACT.md` — Added Session/Workflow tools (stable), Platform tools (experimental), Resources
+- `CHANGELOG_AGENT_NOTES.md` — This entry
+
+---
+
+## 2026-04-12 — Bioprocessing & Bioenergy: Phases 5–7
+
+### New Classes
+
+| Class | Package | Purpose |
+|-------|---------|---------|
+| `FermentationReactor` | `process.equipment.reactor` | Monod/Contois/substrate-inhibited kinetics; batch, fed-batch, continuous modes. Extends `Fermenter`. |
+| `SustainabilityMetrics` | `process.util.fielddevelopment` | CO₂eq tracking (IPCC AR6 GWP), carbon intensity (kgCO₂/MWh), EROI, renewable energy fraction, fossil fuel displacement |
+| `BiogasToGridModule` | `process.processmodel.biorefinery` | Pre-built: AnaerobicDigester → BiogasUpgrader → Compressor → Cooler → grid injection |
+| `GasificationSynthesisModule` | `process.processmodel.biorefinery` | Pre-built: BiomassGasifier → gas cleaning → Fischer-Tropsch synthesis |
+| `WasteToEnergyCHPModule` | `process.processmodel.biorefinery` | Pre-built: AnaerobicDigester → gas engine CHP with electrical + thermal output |
+
+### Key API Patterns
+
+```java
+// FermentationReactor
+FermentationReactor reactor = new FermentationReactor("FR-1", sugarFeed);
+reactor.setKineticModel(FermentationReactor.KineticModel.MONOD);
+reactor.setOperationMode(FermentationReactor.OperationMode.CONTINUOUS);
+reactor.setMaxSpecificGrowthRate(0.30);  // NOT setMuMax()
+reactor.setResidenceTime(10.0, "hr");    // requires unit string
+reactor.setFeedingRate(50.0);            // NOT setFedBatchFeedRate()
+reactor.setFeedSubstrateConcentration(200.0);  // NOT setFedBatchFeedConcentration()
+reactor.run();
+Map<String, Object> results = reactor.getResults();
+
+// BiogasUpgrader enum methods
+BiogasUpgrader.UpgradingTechnology tech = BiogasUpgrader.UpgradingTechnology.MEMBRANE;
+tech.getMethaneRecovery();       // NOT getCh4Recovery()
+tech.getCo2RemovalEfficiency();  // NOT getCo2Removal()
+
+// SustainabilityMetrics
+SustainabilityMetrics metrics = new SustainabilityMetrics();
+metrics.setBiogasProductionNm3PerYear(3_000_000.0);
+metrics.calculate();
+metrics.getCarbonIntensityKgCO2PerMWh();
+
+// BiogasToGridModule
+BiogasToGridModule btg = new BiogasToGridModule("BTG");
+btg.setFeedStream(wasteStream);
+btg.setSubstrateType(AnaerobicDigester.SubstrateType.FOOD_WASTE);
+btg.setUpgradingTechnology(BiogasUpgrader.UpgradingTechnology.MEMBRANE);
+btg.setGridPressureBara(40.0);
+btg.run();
+Map<String, Object> results = btg.getResults();
+```
+
+### Common Mistakes (from testing)
+
+- `getCh4Recovery()` → use `getMethaneRecovery()`
+- `getCo2Removal()` → use `getCo2RemovalEfficiency()`
+- `setMuMax()` → use `setMaxSpecificGrowthRate()`
+- `setResidenceTime(10.0)` → use `setResidenceTime(10.0, "hr")` (unit required)
+- `GasificationSynthesisModule` constructor takes `(String name)` only — set biomass via `setBiomass(BiomassCharacterization, feedRateKgPerHr)`
+
+### Skills/Agents Updated
+
+- `neqsim-capability-map` — added Section I-bis (Bioprocessing & Bioenergy) + quick lookup entries
+- `neqsim-reaction-engineering` — added Bioprocessing Reactors section
+- `copilot-instructions.md` — added bioprocessing class import paths
+- `AGENTS.md` — updated reaction-engineering skill description
+- `CONTEXT.md` — added bioprocessing to equipment and where-to-find tables
+- `neqsim_dev_setup.py` — added all bioprocessing classes to `neqsim_classes()`
+
+### Existing Classes (Phases 1–3, prior sessions)
+
+| Class | Package | Tests |
+|-------|---------|-------|
+| `BiomassCharacterization` | `thermo.characterization` | 12 tests |
+| `AnaerobicDigester` | `process.equipment.reactor` | 10 tests |
+| `BiomassGasifier` | `process.equipment.reactor` | 8 tests |
+| `PyrolysisReactor` | `process.equipment.reactor` | 8 tests |
+| `BiogasUpgrader` | `process.equipment.splitter` | 10 tests |
+| `BiorefineryCostEstimator` | `process.mechanicaldesign` | 18 tests |
+
+---
+
+## 2026-07-12 — LoopedPipeNetwork: 6 Advanced Production Features
+
+### New Capabilities in `LoopedPipeNetwork`
+
+Six production network features added to `neqsim.process.equipment.network.LoopedPipeNetwork`:
+
+1. **Artificial Lift** — Gas lift (`setGasLift`), ESP (`setESP`), jet pump (`setJetPump`), rod pump (`setRodPump`) with `ArtificialLiftType` enum. Pressure boost applied in NR-GGA solver.
+2. **Large-Scale Networks** — 120+ wells with 6 manifolds converge in 15-20 iterations (< 0.1 s). Schur complement keeps matrix size proportional to loops, not elements.
+3. **Water Handling** — `setWaterCut`, `addWaterInjection(src, res, name, rate)`, `setWaterBreakthrough(elem, btWC, finalWC, currentWC)`, `calculateWaterBalance()`.
+4. **Sand/Solids Tracking** — `setSandRate`, `calculateSandTransport()` per DNV RP O501, `getSandViolations()`, configurable erosion/sand rate limits.
+5. **Corrosion & Integrity** — `setCorrosiveGas(elem, co2, h2s)`, `setCorrosionModel(elem, "NORSOK")`, `calculateCorrosion()` with de Waard-Milliams and NORSOK M-506 models, wall life, `getCorrosionViolations()`.
+6. **GHG Emissions** — `setCO2EmissionFactor`, `setMethaneSlipFactor`, `calculateEmissions()`, `getTotalCO2Emissions()`, `getAnnualCO2EmissionsTonnes()`, `getEmissionsIntensity()`. Defaults: EF=2.75, slip=2%, GWP(CH4)=28 (IPCC AR5).
+
+### Affected Skills/Agents
+
+- **neqsim-capability-map**: Updated — no longer "limited to simple networks"
+- **neqsim-production-optimization**: Added LoopedPipeNetwork section with advanced API
+- **neqsim-flow-assurance**: Added network-level corrosion (de Waard/NORSOK) and sand erosion (DNV RP O501) patterns
+- **emissions agent**: Added LoopedPipeNetwork emissions tracking section
+
+### Documentation
+
+- `docs/process/equipment/production_well_networks.md` — 6 new sections with API, formulas, and examples
+- `examples/notebooks/production_network_advanced_features.ipynb` — 25-cell notebook demonstrating all features
+- 96 unit tests in `LoopedPipeNetworkTest.java`
+
+---
+
 ## 2026-07-08 — UniSim Reader: Default E300 Fluid Export
 
 ### E300 is Now the Default Fluid Transfer Route

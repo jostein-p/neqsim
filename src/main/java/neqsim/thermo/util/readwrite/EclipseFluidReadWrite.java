@@ -158,6 +158,11 @@ public class EclipseFluidReadWrite {
   /**
    * Internal implementation. If {@code forcedFluid} is non-null it is used as the target (EOS
    * keyword in file is ignored). Otherwise the EOS keyword drives fluid creation.
+   *
+   * @param inputFile path to the Eclipse E300 fluid file
+   * @param forcedFluid optional pre-created fluid to populate (null to auto-create from EOS
+   *        keyword)
+   * @return the populated fluid system
    */
   private static SystemInterface readImpl(String inputFile, SystemInterface forcedFluid) {
     File file = new File(inputFile);
